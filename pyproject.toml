@@ -14,6 +14,9 @@ dependencies = [
     "loguru>=0.7.2",
     "docker>=7.0.0",
     "jinja2>=3.1.0",
+    "mss>=9.0.1",
+    "PyAutoGUI>=0.9.54",
+    "numpy>=1.26.0",
 ]
 
 [project.optional-dependencies]

@@ -64,3 +64,26 @@ def test_memory_eviction_protocol(temp_vault: str) -> None:
     # Check if they went to L3
     archived = l3.read_entity("Archived Logs")
     assert "Archived conversation segment" in archived
+
+def test_memory_infinite_loop_stress(temp_vault: str) -> None:
+    """
+    Verification: Feed a mock conversation loop >8000 tokens and verify
+    that L1 stays under 4000 tokens while L3 Markdown files are populated.
+    """
+    l1 = L1ContextWindow(max_tokens=4000)
+    l3 = L3ObsidianVault(vault_path=temp_vault)
+    pager = MemoryPager(l1, l3)
+
+    # 400 chars ~= 100 tokens. Let's add 90 messages of 100 tokens = 9000 tokens.
+    huge_message = "a" * 400
+
+    for i in range(90):
+        l1.add_message("user", f"msg_{i}_{huge_message}")
+        pager.check_and_evict(threshold_ratio=0.9) # Evicts at 3600 tokens
+
+    # Verify L1 stayed under max limits despite 9000 tokens of input
+    assert l1.get_token_count() <= 4000
+
+    # Verify L3 contains archived data
+    archived = l3.read_entity("Archived Logs")
+    assert "msg_0" in archived  # The oldest message should be safely on disk
