@@ -18,6 +18,8 @@ dependencies = [
     "PyAutoGUI>=0.9.54",
     "numpy>=1.26.0",
     "pyyaml>=6.0.0",
+    "fastembed>=0.2.6",
+    "rank_bm25>=0.2.2",
 ]
 
 [project.optional-dependencies]
@@ -41,3 +43,9 @@ python_version = "3.10"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
+
+[[tool.mypy.overrides]]
+module = [
+    "rank_bm25.*"
+]
+ignore_missing_imports = true
