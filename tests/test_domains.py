@@ -42,7 +42,10 @@ async def test_feature_architecture_graph_integration() -> None:
 
     # Instantiate Skills
     research_skill = ResearchSkill()
-    tutor_skill = TutorSkill()
+
+    # Create mock IdentityManager for the TutorSkill dependency
+    mock_identity = IdentityManager(config_path="dummy_path.yaml")
+    tutor_skill = TutorSkill(mock_identity)
 
     # Add skills as nodes
     graph.add_node(research_skill.name, research_skill)
@@ -71,4 +74,4 @@ async def test_feature_architecture_graph_integration() -> None:
     # Verify Tutor Skill Mutations
     assert len(final_state.messages) == 1
     assert "calculate gravity" in final_state.messages[0]["content"]
-    assert "first principles" in final_state.messages[0]["content"]
+    assert "Socratic Challenge" in final_state.messages[0]["content"]

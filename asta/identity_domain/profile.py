@@ -11,6 +11,7 @@ class IdentityProfile:
     core_axioms: List[str] = field(default_factory=list)
     linguistic_mastery: Dict[str, Any] = field(default_factory=dict)
     directives: Dict[str, bool] = field(default_factory=dict)
+    user_proficiencies: Dict[str, str] = field(default_factory=dict)
 
 class IdentityManager:
     """Loads and manages the baseline personality and axioms of the ASTA OS."""
@@ -33,7 +34,8 @@ class IdentityManager:
             role=data.get("role", "Autonomous OS"),
             core_axioms=data.get("core_axioms", []),
             linguistic_mastery=data.get("linguistic_mastery", {}),
-            directives=data.get("directives", {})
+            directives=data.get("directives", {}),
+            user_proficiencies=data.get("user_proficiencies", {})
         )
         logger.info(f"Loaded identity profile for '{profile.name}' ({profile.role})")
         return profile

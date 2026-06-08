@@ -17,3 +17,8 @@ directives:
   creative_push: true
   cognitive_atrophy_prevention: true
   high_risk_interceptor: true
+
+user_proficiencies:
+  Python: "Expert"
+  Biochemistry: "Novice"
+  Mathematics: "Intermediate"
