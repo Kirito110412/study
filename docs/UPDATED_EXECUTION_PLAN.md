@@ -73,3 +73,27 @@ This document outlines the strict, session-by-session execution strategy to buil
 2. When a massive task is detected, the Orchestrator splits the task into sub-graphs (e.g., Graph A: Researcher, Graph B: Coder).
 3. Each sub-graph is executed concurrently via `asyncio.gather`. The Orchestrator waits for all sub-graphs to reach `END` before synthesizing the final output.
 4. **Verification:** Command ASTA to "Research quantum computing and simultaneously write a Python script calculating gravity." Verify both tasks run in parallel and their outputs are combined at the end.
+
+---
+
+## Phase 10: Omnipotent Host Operations & Precision Application Control
+
+### Session 16: The Dual-Pathway Host Executor
+**Goal:** Break out of the sandbox to perform direct CRUD operations on the user's host OS while maintaining strict safety boundaries.
+**Tasks:**
+1. Implement `asta/security_isolation/host_executor.py`.
+2. Establish a **Dual-Pathway Architecture**:
+   - Untrusted code (Skill Forge) runs in Docker.
+   - Explicit user requests (e.g., "Delete this file", "Move my documents") run via the `HostExecutor` on the native machine.
+3. Hook the `HostExecutor` into the HIL EventBus. Any destructive command (`rm`, `mv`, overwrite) outside of the immediate ASTA workspace must trigger an `APPROVAL_REQUIRED` event.
+4. **Verification:** Ask the agent to delete a local file on the host OS. Verify the system pauses and demands explicit terminal confirmation before acting.
+
+### Session 17: Precision Application Actuation (WhatsApp & Minecraft)
+**Goal:** Enable ASTA to natively hook into and physically operate high-precision host applications.
+**Tasks:**
+1. Implement `asta/actuation_sensory/precision_controller.py`.
+2. Build OS-level window focus hooks to bring specific applications (e.g., WhatsApp, Minecraft) to the foreground.
+3. Develop hybrid actuation routines:
+   - **Programmatic (MCP):** Connect to APIs where applicable for fast data retrieval.
+   - **Physical (VLM + Motor):** Read the screen and generate high-frequency keybinds and mouse movements. For Minecraft, this allows Asta to "play" the game alongside the user, placing blocks physically to create structures.
+4. **Verification:** Test the system's ability to focus a mock application window and stream a sequence of precision keyboard inputs (e.g., WASD movements and block placements) seamlessly.
