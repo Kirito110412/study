@@ -21,6 +21,7 @@ class EventBus:
         self._queue: asyncio.Queue[Event] = asyncio.Queue()
         self._task: asyncio.Task[None] | None = None
         self._running: bool = False
+        self.last_activity_time: float = time.time()
 
     def subscribe(self, event_type: str, handler: Callable[[Event], Coroutine[Any, Any, None]]) -> None:
         """Subscribe an async handler to a specific event type."""
@@ -37,6 +38,10 @@ class EventBus:
 
     async def publish(self, event: Event) -> None:
         """Publish an event to the bus."""
+        # SLEEP_CYCLE events are background internal events, they don't reset the user activity timer.
+        if event.type != "SLEEP_CYCLE_HEARTBEAT":
+            self.last_activity_time = time.time()
+
         await self._queue.put(event)
         logger.debug(f"Published event '{event.type}' with payload {event.payload}")
 
