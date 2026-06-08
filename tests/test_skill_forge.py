@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 from asta.core_engine.graph import AstaGraph, AstaState
 from asta.security_isolation.executor import SandboxExecutor
 from asta.feature_architecture.skill_forge import SkillForgeNode
+from asta.core_engine.llm_gateway import LLMGateway
 
 
 from typing import Generator
@@ -23,15 +24,21 @@ def mock_sandbox() -> SandboxExecutor:
     sandbox.run_command = AsyncMock(return_value=(0, "Result: 6765"))
     return sandbox
 
+@pytest.fixture
+def mock_llm() -> LLMGateway:
+    llm = MagicMock(spec=LLMGateway)
+    llm.generate_completion = AsyncMock(return_value="def calculate_complex_math():\n    print('Result: 6765')")
+    return llm
+
 
 @pytest.mark.asyncio
-async def test_skill_forge_generation_and_testing(mock_sandbox: SandboxExecutor, temp_skills_dir: str) -> None:
+async def test_skill_forge_generation_and_testing(mock_sandbox: SandboxExecutor, mock_llm: LLMGateway, temp_skills_dir: str) -> None:
     """
     Verify that the Skill Forge writes a script, tests it in the sandbox,
     and permanently saves it if the exit code is 0.
     """
     graph = AstaGraph()
-    forge_node = SkillForgeNode(sandbox=mock_sandbox, skills_dir=temp_skills_dir)
+    forge_node = SkillForgeNode(sandbox=mock_sandbox, llm=mock_llm, skills_dir=temp_skills_dir)
 
     # Build Graph
     graph.add_node("forge", forge_node) # type: ignore
@@ -67,12 +74,12 @@ async def test_skill_forge_generation_and_testing(mock_sandbox: SandboxExecutor,
 
 
 @pytest.mark.asyncio
-async def test_skill_forge_failure(mock_sandbox: SandboxExecutor, temp_skills_dir: str) -> None:
+async def test_skill_forge_failure(mock_sandbox: SandboxExecutor, mock_llm: LLMGateway, temp_skills_dir: str) -> None:
     """Verify that a failed script is NOT saved permanently and errors are logged."""
     # Mock failure
     mock_sandbox.run_command = AsyncMock(return_value=(1, "SyntaxError: invalid syntax")) # type: ignore
 
-    forge_node = SkillForgeNode(sandbox=mock_sandbox, skills_dir=temp_skills_dir)
+    forge_node = SkillForgeNode(sandbox=mock_sandbox, llm=mock_llm, skills_dir=temp_skills_dir)
 
     state = AstaState()
     state.m_active["missing_tool_task"] = "Bad Script"

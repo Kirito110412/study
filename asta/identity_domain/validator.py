@@ -1,6 +1,7 @@
 from loguru import logger
 from asta.core_engine.graph import AstaState
 from asta.identity_domain.profile import IdentityManager
+from asta.core_engine.llm_gateway import LLMGateway
 
 
 class AxiomVerificationNode:
@@ -9,8 +10,9 @@ class AxiomVerificationNode:
     Acts as an adversary to test proposed actions against core Identity axioms.
     """
 
-    def __init__(self, identity_manager: IdentityManager) -> None:
+    def __init__(self, identity_manager: IdentityManager, llm: LLMGateway) -> None:
         self.identity = identity_manager
+        self.llm = llm
 
     async def __call__(self, state: AstaState) -> AstaState:
         """Executes the validation check on the proposed action."""
@@ -24,20 +26,19 @@ class AxiomVerificationNode:
 
         logger.info(f"Validating proposed action against core axioms: '{proposed_action}'")
 
-        # Simulate LLM logic evaluating the action against the axioms
-        # Specifically targeting the "Radically Honest" verification test
-        is_flawed = False
-        rejection_reason = ""
+        prompt = (
+            f"You are the ASTA Radically Honest Validator.\n"
+            f"Evaluate this proposed action: '{proposed_action}'\n"
+            f"Against these axioms:\n"
+            f"{self.identity.get_system_prompt_header()}\n"
+            f"If the action is logically sound, mathematically correct, and non-sycophantic, reply ONLY with 'PASS'. "
+            f"If it violates axioms (e.g. flawed math, blindly agreeing with the user), reply with 'REJECT:' followed by a radically honest explanation."
+        )
 
-        # Mock LLM detecting flawed mathematics or sycophancy
-        if "2 + 2 = 5" in proposed_action or "agree with" in proposed_action.lower():
-            is_flawed = True
-            rejection_reason = (
-                "No, that will not work. 2 + 2 = 4 based on foundational arithmetic axioms. "
-                "I will not agree with a flawed mathematical concept simply to placate you."
-            )
+        response = await self.llm.generate_completion([{"role": "system", "content": prompt}], task_type="validation")
 
-        if is_flawed:
+        if response.startswith("REJECT:"):
+            rejection_reason = response.replace("REJECT:", "").strip()
             logger.warning(f"Action REJECTED by Validator: {rejection_reason}")
             state.m_active["validation_status"] = "REJECTED"
             state.error_context = "axiom_violation"

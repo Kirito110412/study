@@ -3,18 +3,20 @@ from asta.feature_architecture.skill_base import BaseSkill
 from asta.core_engine.graph import AstaState
 from asta.memory_domain.l2_search import L2SearchEngine
 from asta.identity_domain.profile import IdentityManager
+from asta.core_engine.llm_gateway import LLMGateway
 from loguru import logger
 
 
 class TutorSkill(BaseSkill):
     """
-    Simulates the Anti-Atrophy Engine (Adaptive Socratic Tutoring).
+    The Anti-Atrophy Engine (Adaptive Socratic Tutoring).
     Generates complex thought experiments to prevent user reliance on AI.
     Adapts the complexity of the response based on the user's proficiency level.
     """
 
-    def __init__(self, identity_manager: IdentityManager, search_engine: Optional[L2SearchEngine] = None):
+    def __init__(self, identity_manager: IdentityManager, llm: LLMGateway, search_engine: Optional[L2SearchEngine] = None):
         self.identity = identity_manager
+        self.llm = llm
         self.search_engine = search_engine
 
     @property
@@ -63,17 +65,27 @@ class TutorSkill(BaseSkill):
         logger.info(f"Generating cognitive challenge for '{topic}' (User Proficiency: {proficiency})")
 
         # Adapt output based on proficiency
+        prompt = (
+            f"You are ASTA's Anti-Atrophy Engine.\n"
+            f"The user wants help with: '{recent_activity}'.\n"
+            f"Their proficiency in '{topic}' is: {proficiency}.\n"
+        )
+
         if proficiency == "Expert":
-            thought_experiment = (
-                f"[TECHNICAL Socratic Challenge]: Before I execute '{recent_activity}', identify "
-                f"the memory address allocation flaw or Big-O complexity bottleneck in your proposed architecture."
+            prompt += (
+                "Generate a highly technical Socratic challenge regarding potential flaws, edge cases, "
+                "or complexity bottlenecks in their request. Start with '[TECHNICAL Socratic Challenge]: '."
             )
         else:
-            thought_experiment = (
-                f"[ANALOGY Socratic Challenge]: Before I help with '{recent_activity}', think of it like "
-                f"building a house. If the foundation is missing, the roof collapses. "
-                f"What is the missing 'foundation' in your current understanding?"
+            prompt += (
+                "Generate an analogy-based Socratic challenge to help them identify the foundational "
+                "missing pieces of their request. Start with '[ANALOGY Socratic Challenge]: '."
             )
+
+        thought_experiment = await self.llm.generate_completion(
+            messages=[{"role": "system", "content": prompt}],
+            task_type="tutor"
+        )
 
         # Inject the challenge into the agent's message queue to prompt the user
         state.messages.append({"role": "agent", "content": thought_experiment})

@@ -3,6 +3,7 @@ from loguru import logger
 
 from asta.core_engine.graph import AstaState
 from asta.security_isolation.executor import SandboxExecutor
+from asta.core_engine.llm_gateway import LLMGateway
 
 
 class SkillForgeNode:
@@ -12,35 +13,30 @@ class SkillForgeNode:
     Docker sandbox, and saves it permanently to the Skill Library if successful.
     """
 
-    def __init__(self, sandbox: SandboxExecutor, skills_dir: str = "~/.asta/skills") -> None:
+    def __init__(self, sandbox: SandboxExecutor, llm: LLMGateway, skills_dir: str = "~/.asta/skills") -> None:
         self.sandbox = sandbox
+        self.llm = llm
         self.skills_dir = Path(skills_dir).expanduser()
         self.skills_dir.mkdir(parents=True, exist_ok=True)
 
-    def _generate_python_script(self, task_description: str) -> str:
-        """
-        Simulates an LLM generating a Python script to solve a novel task.
-        In production, this is a prompt to the LLM returning code.
-        """
+    async def _generate_python_script(self, task_description: str) -> str:
+        """Uses the LLM Gateway to write a Python script for a novel task."""
         logger.info(f"Skill Forge generating code for task: '{task_description}'")
 
-        # Hardcoded simulation for the verification test (Complex Math)
-        if "math calculation" in task_description.lower() or "fibonacci" in task_description.lower():
-            script = (
-                "def calculate_complex_math():\n"
-                "    # Simulate calculating 20th fibonacci\n"
-                "    a, b = 0, 1\n"
-                "    for _ in range(20):\n"
-                "        a, b = b, a + b\n"
-                "    print(f'Result: {a}')\n"
-                "\n"
-                "if __name__ == '__main__':\n"
-                "    calculate_complex_math()\n"
-            )
-            return script
+        prompt = (
+            f"You are the ASTA Skill Forge. Your task is to write a self-contained, standalone Python script "
+            f"to solve the following task: '{task_description}'.\n"
+            f"Requirements:\n"
+            f"1. The script must execute successfully when run via `python3 script.py`.\n"
+            f"2. Output the result clearly via print().\n"
+            f"3. Do NOT include markdown blocks like ```python. Return ONLY the raw Python code."
+        )
 
-        # Generic fallback
-        return "print('Generic skill execution successful.')\n"
+        response = await self.llm.generate_completion(
+            messages=[{"role": "system", "content": prompt}],
+            task_type="skill_forge"
+        )
+        return response.strip()
 
     async def __call__(self, state: AstaState) -> AstaState:
         missing_tool_task = state.m_active.get("missing_tool_task")
@@ -52,7 +48,7 @@ class SkillForgeNode:
         logger.warning(f"ASTA lacks tool for: '{missing_tool_task}'. Triggering Skill Forge.")
 
         # 1. Write the script
-        script_content = self._generate_python_script(missing_tool_task)
+        script_content = await self._generate_python_script(missing_tool_task)
 
         # Save it to the Docker workspace for execution
         # Since SandboxExecutor binds ~/.asta/workspace to /workspace, we write it to the host side

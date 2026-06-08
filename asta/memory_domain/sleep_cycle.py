@@ -7,6 +7,7 @@ from loguru import logger
 from asta.core_engine.event_bus import EventBus, Event
 from asta.memory_domain.l2_search import L2SearchEngine
 from asta.memory_domain.l3_obsidian import L3ObsidianVault
+from asta.core_engine.llm_gateway import LLMGateway
 
 
 class SleepCycleManager:
@@ -19,10 +20,12 @@ class SleepCycleManager:
                  event_bus: EventBus,
                  search_engine: L2SearchEngine,
                  vault: L3ObsidianVault,
+                 llm: LLMGateway,
                  idle_threshold_minutes: float = 5.0) -> None:
         self.event_bus = event_bus
         self.search_engine = search_engine
         self.vault = vault
+        self.llm = llm
         self.idle_threshold_seconds = idle_threshold_minutes * 60
         self._running = False
         self._task: asyncio.Task[None] | None = None
@@ -118,8 +121,8 @@ class SleepCycleManager:
             # Combine the texts
             texts_to_merge = [docs[i] for i in indices]
 
-            # Simulate LLM summarization of duplicates
-            merged_fact = self._simulate_llm_merge(texts_to_merge)
+            # Real LLM summarization of duplicates
+            merged_fact = await self._llm_merge(texts_to_merge)
 
             # Write to Vault
             entity_name = target_file.replace('.md', '').replace('_', ' ')
@@ -133,6 +136,20 @@ class SleepCycleManager:
         await asyncio.to_thread(engine._build_index)
         logger.info("Sleep cycle consolidation and re-indexing complete.")
 
-    def _simulate_llm_merge(self, texts: List[str]) -> str:
-        """Mocks an LLM consolidating multiple similar facts into one."""
-        return f"[CONSOLIDATED FACT]: {texts[0]} (and {len(texts)-1} similar entries merged)"
+    async def _llm_merge(self, texts: List[str]) -> str:
+        """Uses the LLM Gateway to consolidate multiple similar facts into one."""
+        prompt = (
+            "You are the ASTA Memory Consolidation Engine.\n"
+            "Below are several fragmented, highly similar memories. "
+            "Combine them into a single, comprehensive, and concise factual statement.\n"
+            "Respond ONLY with the consolidated fact.\n\n"
+            "Memories:\n"
+        )
+        for t in texts:
+            prompt += f"- {t}\n"
+
+        response = await self.llm.generate_completion(
+            messages=[{"role": "system", "content": prompt}],
+            task_type="sleep_cycle"
+        )
+        return f"[CONSOLIDATED FACT]: {response.strip()}"

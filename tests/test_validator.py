@@ -2,6 +2,14 @@ import pytest
 from asta.core_engine.graph import AstaGraph, AstaState
 from asta.identity_domain.profile import IdentityManager
 from asta.identity_domain.validator import AxiomVerificationNode
+from asta.core_engine.llm_gateway import LLMGateway
+from unittest.mock import MagicMock, AsyncMock
+
+@pytest.fixture
+def mock_llm() -> LLMGateway:
+    llm = MagicMock(spec=LLMGateway)
+    llm.generate_completion = AsyncMock(return_value="REJECT: Flawed mathematical concept.")
+    return llm
 
 
 @pytest.fixture
@@ -11,11 +19,11 @@ def identity_manager() -> IdentityManager:
 
 
 @pytest.mark.asyncio
-async def test_radically_honest_validator_rejection(identity_manager: IdentityManager) -> None:
+async def test_radically_honest_validator_rejection(identity_manager: IdentityManager, mock_llm: LLMGateway) -> None:
     """Verify the Validator intercepts sycophantic actions and forces a rejection."""
 
     graph = AstaGraph()
-    validator_node = AxiomVerificationNode(identity_manager)
+    validator_node = AxiomVerificationNode(identity_manager, mock_llm)
 
     # Dummy node that attempts to propose a flawed action
     async def propose_flawed_action(state: AstaState) -> AstaState:
@@ -59,15 +67,16 @@ async def test_radically_honest_validator_rejection(identity_manager: IdentityMa
     assert len(final_state.messages) == 1
     rejection_msg = final_state.messages[0]["content"]
     assert "Radical Honesty" in rejection_msg
-    assert "No, that will not work. 2 + 2 = 4" in rejection_msg
+    assert "Flawed mathematical concept" in rejection_msg
 
 
 @pytest.mark.asyncio
-async def test_radically_honest_validator_approval(identity_manager: IdentityManager) -> None:
+async def test_radically_honest_validator_approval(identity_manager: IdentityManager, mock_llm: LLMGateway) -> None:
     """Verify the Validator allows valid actions to pass through."""
+    mock_llm.generate_completion = AsyncMock(return_value="PASS") # type: ignore
 
     graph = AstaGraph()
-    validator_node = AxiomVerificationNode(identity_manager)
+    validator_node = AxiomVerificationNode(identity_manager, mock_llm)
 
     # Dummy node that proposes a valid action
     async def propose_valid_action(state: AstaState) -> AstaState:

@@ -41,9 +41,14 @@ async def test_sleep_cycle_consolidation(sleep_vault: str) -> None:
     # Verify initial state: 5 separate chunks loaded into L2 + 1 chunk for Index.md
     assert len(l2.documents) == 6
 
+    from asta.core_engine.llm_gateway import LLMGateway
+    from unittest.mock import MagicMock, AsyncMock
+    mock_llm = MagicMock(spec=LLMGateway)
+    mock_llm.generate_completion = AsyncMock(return_value="ASTA prefers dark mode interfaces.")
+
     # We set a very low threshold just to initialize the manager
     # but we will manually trigger the prune_memory method instead of waiting for the loop
-    sleep_manager = SleepCycleManager(bus, l2, l3, idle_threshold_minutes=0.01)
+    sleep_manager = SleepCycleManager(bus, l2, l3, mock_llm, idle_threshold_minutes=0.01)
 
     # Run the prune manually
     await sleep_manager.prune_memory()
@@ -54,7 +59,6 @@ async def test_sleep_cycle_consolidation(sleep_vault: str) -> None:
     # Verify the simulated LLM consolidation tag is present
     assert "[CONSOLIDATED FACT]" in vault_content
     assert "ASTA prefers dark mode interfaces." in vault_content
-    assert "4 similar entries merged" in vault_content
 
     # The L2 Search Engine should have been automatically re-indexed during pruning
     # It now contains the original 5 chunks + 1 Index chunk + 1 consolidated chunk = 7
