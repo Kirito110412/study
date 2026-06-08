@@ -19,11 +19,47 @@ class AstaState:
     current_node: str = "start"
     error_context: Optional[str] = None
     messages: list[Dict[str, str]] = field(default_factory=list)
+    pending_approval: Optional[Dict[str, Any]] = None
 
 
 class NodeFunc(Protocol):
     """Protocol defining the signature of a Node execution function."""
     async def __call__(self, state: AstaState) -> AstaState: ...
+
+
+class ApprovalNode:
+    """
+    Halts graph execution to request explicit Human-In-The-Loop approval.
+    Useful for abstract graph-level decisions (e.g., permanently saving a new skill).
+    Note: Lower-level system approvals (like Docker shell commands) are handled
+    directly via the SandboxExecutor and EventBus.
+    """
+
+    async def __call__(self, state: AstaState) -> AstaState:
+        # Check if the node is already waiting on approval
+        if state.pending_approval and state.pending_approval.get("status") == "WAITING":
+            logger.info("Graph is waiting for Human-In-The-Loop approval...")
+            # In a fully asynchronous graph engine, this node would return the state
+            # and the Orchestrator would suspend graph execution until the EventBus
+            # wakes it back up. For MVP, we mark the status.
+            return state
+
+        # Initialize an approval request
+        action_to_approve = state.m_active.get("action_to_approve", "Unknown Action")
+        logger.warning(f"ACTION APPROVAL REQUIRED: {action_to_approve}")
+
+        state.pending_approval = {
+            "action": action_to_approve,
+            "status": "WAITING"
+        }
+
+        # Inject the request into the user conversation state
+        state.messages.append({
+            "role": "agent",
+            "content": f"[APPROVAL REQUIRED]: Are you sure you want to execute '{action_to_approve}'? (Y/N)"
+        })
+
+        return state
 
 
 class EdgeFunc(Protocol):

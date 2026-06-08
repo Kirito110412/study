@@ -43,12 +43,13 @@ def mock_docker_env() -> Generator[DockerEnvironment, None, None]:
         env.stop()
 
 
-def test_sandbox_execution(mock_docker_env: DockerEnvironment) -> None:
+@pytest.mark.asyncio
+async def test_sandbox_execution(mock_docker_env: DockerEnvironment) -> None:
     """Verify that the agent can execute commands in the isolated container."""
     executor = SandboxExecutor(mock_docker_env)
 
     # Run a simple echo command
-    exit_code, output = executor.run_command("echo 'hello from sandbox'")
+    exit_code, output = await executor.run_command("echo 'hello from sandbox'")
     assert exit_code == 0
     assert "hello from sandbox" in output
 
@@ -60,11 +61,13 @@ def test_sandbox_execution(mock_docker_env: DockerEnvironment) -> None:
             workdir="/workspace"
         )
 
-def test_sandbox_volume_binding(mock_docker_env: DockerEnvironment) -> None:
+
+@pytest.mark.asyncio
+async def test_sandbox_volume_binding(mock_docker_env: DockerEnvironment) -> None:
     """Verify that the host workspace is bound correctly to the container."""
     executor = SandboxExecutor(mock_docker_env)
 
     # Read the file from inside the container (mocked to return 'secure data')
-    exit_code, output = executor.run_command("cat /workspace/test_file.txt")
+    exit_code, output = await executor.run_command("cat /workspace/test_file.txt")
     assert exit_code == 0
     assert "secure data" in output

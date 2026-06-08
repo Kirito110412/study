@@ -29,6 +29,12 @@ class EventBus:
         self._subscribers[event_type].append(handler)
         logger.debug(f"Subscribed handler {handler.__name__} to event '{event_type}'")
 
+    def unsubscribe(self, event_type: str, handler: Callable[[Event], Coroutine[Any, Any, None]]) -> None:
+        """Unsubscribe an async handler from a specific event type."""
+        if event_type in self._subscribers and handler in self._subscribers[event_type]:
+            self._subscribers[event_type].remove(handler)
+            logger.debug(f"Unsubscribed handler {handler.__name__} from event '{event_type}'")
+
     async def publish(self, event: Event) -> None:
         """Publish an event to the bus."""
         await self._queue.put(event)
