@@ -59,9 +59,9 @@ class EventBus:
     async def stop(self) -> None:
         """Stop the event bus and wait for pending events to be processed."""
         if self._running:
-            self._running = False
-            # Wait until the queue is fully processed
+            # Wait until the queue is fully processed before shutting down the loop
             await self._queue.join()
+            self._running = False
             if self._task:
                 self._task.cancel()
                 try:
