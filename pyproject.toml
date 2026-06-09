@@ -26,6 +26,7 @@ dependencies = [
     "mcp>=1.0.0",
     "litellm>=1.0.0",
     "networkx>=3.0",
+    "reportlab>=4.0.0",
 ]
 
 [project.optional-dependencies]
