@@ -40,7 +40,8 @@ def test_l3_obsidian_storage(temp_vault: str) -> None:
     assert "[[User Preferences]]" in index_content
 
 
-def test_memory_eviction_protocol(temp_vault: str) -> None:
+@pytest.mark.asyncio
+async def test_memory_eviction_protocol(temp_vault: str) -> None:
     l1 = L1ContextWindow(max_tokens=20) # Very small limit for testing
     l3 = L3ObsidianVault(vault_path=temp_vault)
     pager = MemoryPager(l1, l3)
@@ -53,7 +54,7 @@ def test_memory_eviction_protocol(temp_vault: str) -> None:
     assert len(l1.messages) == 4
 
     # Trigger pager
-    evicted = pager.check_and_evict(threshold_ratio=0.9)
+    evicted = await pager.check_and_evict(threshold_ratio=0.9)
 
     assert evicted is True
     # 50% of messages should be removed
@@ -65,7 +66,8 @@ def test_memory_eviction_protocol(temp_vault: str) -> None:
     archived = l3.read_entity("Archived Logs")
     assert "Archived conversation segment" in archived
 
-def test_memory_infinite_loop_stress(temp_vault: str) -> None:
+@pytest.mark.asyncio
+async def test_memory_infinite_loop_stress(temp_vault: str) -> None:
     """
     Verification: Feed a mock conversation loop >8000 tokens and verify
     that L1 stays under 4000 tokens while L3 Markdown files are populated.
@@ -79,7 +81,7 @@ def test_memory_infinite_loop_stress(temp_vault: str) -> None:
 
     for i in range(90):
         l1.add_message("user", f"msg_{i}_{huge_message}")
-        pager.check_and_evict(threshold_ratio=0.9) # Evicts at 3600 tokens
+        await pager.check_and_evict(threshold_ratio=0.9) # Evicts at 3600 tokens
 
     # Verify L1 stayed under max limits despite 9000 tokens of input
     assert l1.get_token_count() <= 4000
