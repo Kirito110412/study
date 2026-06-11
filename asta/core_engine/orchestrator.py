@@ -6,14 +6,18 @@ from loguru import logger
 from asta.core_engine.graph import AstaGraph, AstaState
 
 
+from asta.core_engine.event_bus import EventBus, Event
+
 class Orchestrator:
     """
     Manages the 'Jarvis' level Multi-Agent Spawning capability.
     Splits massive tasks into parallel sub-graphs and synthesizes their outputs.
+    Emits real-time telemetry to the EventBus for dashboard monitoring.
     """
 
-    def __init__(self, base_graph: AstaGraph) -> None:
+    def __init__(self, base_graph: AstaGraph, event_bus: EventBus) -> None:
         self.base_graph = base_graph
+        self.event_bus = event_bus
 
     def _clone_graph_for_subtask(self, subtask_name: str) -> AstaGraph:
         """
@@ -29,6 +33,11 @@ class Orchestrator:
         """Executes a single sub-task on an isolated graph instance."""
         logger.info(f"Sub-Agent '{task_id}' started: {task_desc}")
 
+        await self.event_bus.publish(Event(
+            type="AGENT_SPAWNED",
+            payload={"agent_id": task_id, "task": task_desc}
+        ))
+
         sub_graph = self._clone_graph_for_subtask(task_id)
 
         # Isolate the state for this sub-agent
@@ -41,10 +50,18 @@ class Orchestrator:
         try:
             final_sub_state = await sub_graph.execute(sub_state)
             logger.info(f"Sub-Agent '{task_id}' finished successfully.")
+            await self.event_bus.publish(Event(
+                type="AGENT_COMPLETED",
+                payload={"agent_id": task_id, "status": "success"}
+            ))
             return final_sub_state
         except Exception as e:
             logger.error(f"Sub-Agent '{task_id}' failed: {e}")
             sub_state.error_context = f"sub_agent_failure: {e}"
+            await self.event_bus.publish(Event(
+                type="AGENT_COMPLETED",
+                payload={"agent_id": task_id, "status": "failed", "error": str(e)}
+            ))
             return sub_state
 
     async def delegate_massive_task(self, main_task: str, sub_tasks: List[str], base_state: AstaState) -> AstaState:

@@ -34,7 +34,9 @@ async def test_sub_agent_concurrent_spawning() -> None:
     graph.add_edge("process", "END")
     graph.set_entry_point("process")
 
-    orchestrator = Orchestrator(graph)
+    from asta.core_engine.event_bus import EventBus
+    bus = EventBus()
+    orchestrator = Orchestrator(graph, event_bus=bus)
     base_state = AstaState()
 
     # 2. Delegate the massive task

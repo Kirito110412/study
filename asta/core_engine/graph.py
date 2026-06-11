@@ -73,10 +73,11 @@ class AstaGraph:
     for Asta's state machine.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, event_bus: Optional[Any] = None) -> None:
         self.nodes: Dict[str, NodeFunc] = {}
         self.edges: Dict[str, Union[str, EdgeFunc]] = {}
         self.entry_point: str = ""
+        self.event_bus = event_bus
 
     def add_node(self, name: str, action: NodeFunc) -> None:
         """Register a node logic function."""
@@ -124,6 +125,17 @@ class AstaGraph:
             # Execute Node Action
             action = self.nodes[current_name]
             logger.debug(f"Executing node: {current_name}")
+
+            # Emit execution telemetry if requested by Orchestrator
+            agent_id = state.m_active.get("sub_agent_id")
+            if agent_id and hasattr(self, 'event_bus') and self.event_bus:
+                await self.event_bus.publish(
+                    __import__('asta.core_engine.event_bus', fromlist=['Event']).Event(
+                        type="AGENT_LOG",
+                        payload={"agent_id": agent_id, "log": f"Executing node: {current_name}"}
+                    )
+                )
+
             state = await action(state)
 
             # Determine Next Node (Routing)

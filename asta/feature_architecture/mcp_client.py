@@ -26,13 +26,46 @@ class DynamicMCPSkill(BaseSkill):
 
     async def execute(self, state: AstaState) -> AstaState:
         # Extract arguments for the tool from the active state
-        # In a full implementation, an LLM router node maps the user request to these args.
         args = state.m_active.get(f"{self.name}_args", {})
 
-        logger.info(f"Executing MCP Tool '{self.name}' with args: {args}")
+        # Check if the node is already waiting on approval
+        if state.pending_approval and state.pending_approval.get("status") == "WAITING":
+            logger.info(f"MCP Tool '{self.name}' is waiting for CEO approval...")
+            return state
 
+        logger.info(f"Requesting MCP Tool execution approval for '{self.name}' with args: {args}")
+
+        # Suspend graph and request UI approval
+        state.pending_approval = {
+            "action": f"MCP_TOOL:{self.name}",
+            "args": args,
+            "status": "WAITING"
+        }
+
+        # If we have an event bus, broadcast the need for approval
+        if hasattr(self._mcp_client, "event_bus") and self._mcp_client.event_bus:
+            # We don't block locally here. The orchestrator will catch the state return
+            # and re-execute once approval is granted by the dashboard via event.
+            await self._mcp_client.event_bus.publish(
+                # Use a specific event type that the dashboard listens to
+                # We mock the Event import for simplicity in this file
+                __import__('asta.core_engine.event_bus', fromlist=['Event']).Event(
+                    type="AGENT_MCP_APPROVAL_REQUIRED",
+                    payload={
+                        "agent_id": state.m_active.get("sub_agent_id", "Main"),
+                        "tool": self.name,
+                        "args": args
+                    }
+                )
+            )
+            return state
+
+        # If no event bus is present (e.g. basic CLI test), execute instantly
+        await self._execute_tool(state, args)
+        return state
+
+    async def _execute_tool(self, state: AstaState, args: Dict[str, Any]) -> None:
         try:
-            # Note: Assuming self._mcp_client has an async `call_tool` method
             result = await self._mcp_client.call_tool(self.name, arguments=args)
 
             # Store the result in the active state
@@ -43,8 +76,6 @@ class DynamicMCPSkill(BaseSkill):
             logger.error(f"Failed to execute MCP Tool '{self.name}': {e}")
             state.error_context = f"mcp_tool_failure_{self.name}"
 
-        return state
-
 
 class MCPToolClient:
     """
@@ -52,8 +83,9 @@ class MCPToolClient:
     and dynamically converts their tools into ASTA Skills.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, event_bus: Optional[Any] = None) -> None:
         self.connected_servers: Dict[str, Any] = {}
+        self.event_bus = event_bus
         # In a real implementation we would hold actual `mcp.client.session.ClientSession`s
         # For this prototype we will use duck-typed mock interfaces to demonstrate the architecture
 
